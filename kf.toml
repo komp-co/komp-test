@@ -1,6 +1,13 @@
 [project]
 name = "komp_test"
-description = "The test driver behind `komp test`"
+description = "Test runner for KFlat, and `testing`, the library tests are written against"
 version = "0.1.0"
-kind = "bin"
-kflat = "0.19"
+kflat = "0.23"
+
+[lib]
+name = "testing"
+
+[bin]
+
+[native]
+hosted_c_sources = ["native/testing_hosted.c"]

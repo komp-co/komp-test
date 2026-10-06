@@ -1,0 +1,45 @@
+fun nothing(): void {}
+
+@test
+fun a_test_without_a_name_shows_its_function(): void {
+    val one = AnnotatedFunction<test, () -> void> {
+        name: "adds", module: "app", file: "src/a_test.kf", line: 1,
+        args: test { name: "", panics: FaultKind.NoFault }, function: nothing
+    }
+    assert_eq(shown_name(&one), "adds", "the function's name")
+}
+
+@test
+fun a_named_test_shows_its_name(): void {
+    val one = AnnotatedFunction<test, () -> void> {
+        name: "adds", module: "app", file: "src/a_test.kf", line: 1,
+        args: test { name: "one and one", panics: FaultKind.NoFault }, function: nothing
+    }
+    assert_eq(shown_name(&one), "one and one", "the name it was given")
+}
+
+@test
+fun a_disabled_test_gives_its_reason(): void {
+    val one = AnnotatedFunction<test, () -> void> {
+        name: "adds", module: "app", file: "src/a_test.kf", line: 1,
+        args: test { name: "", panics: FaultKind.NoFault }, function: nothing
+    }
+    val back = [AnnotatedFunction<disabled, () -> void> {
+        name: "adds", module: "app", file: "src/a_test.kf", line: 1, args: disabled { reason: "waiting" },
+        function: nothing
+    }]
+    assert_eq(disabled_reason(&back, &one) ?: "", "waiting", "the reason")
+}
+
+@test
+fun a_test_disabled_in_another_module_still_runs(): void {
+    val one = AnnotatedFunction<test, () -> void> {
+        name: "adds", module: "app", file: "src/a_test.kf", line: 1,
+        args: test { name: "", panics: FaultKind.NoFault }, function: nothing
+    }
+    val back = [AnnotatedFunction<disabled, () -> void> {
+        name: "adds", module: "app.other", file: "src/a_test.kf", line: 1, args: disabled { reason: "waiting" },
+        function: nothing
+    }]
+    assert_eq(disabled_reason(&back, &one) == null, true, "matched by module and name")
+}

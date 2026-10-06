@@ -49,7 +49,7 @@ jobs:
       - name: Unit tests
         run: komp test .
 
-      - name: Run its own test program through itself
+      - name: Run its own test programs through itself
         run: |
           komp build .
-          target/kflat/komp_test target/kflat/test/komp_test_tests
+          target/kflat/komp_test target/kflat/test/testing_tests target/kflat/test/komp_test_bin_tests

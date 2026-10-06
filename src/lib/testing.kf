@@ -1,0 +1,126 @@
+// The test program's entry point. The generated main hands it every test of
+// the crate and every disabled one, and the hosted runtime runs each test in
+// a child process.
+
+/// A test: `komp test` runs every function it marks, each in its own
+/// process. `name` is shown in place of the function's name; `panics` makes
+/// the test pass only when it panics with that kind. Reachable without an
+/// import.
+pub annotation test(name: str = "", panics: FaultKind = FaultKind.NoFault) on () -> void
+
+/// A test that is still checked but not run; the report lists it as ignored,
+/// with `reason`. Reachable without an import.
+pub annotation disabled(reason: str) on () -> void
+
+extern "C" fun kf_test_report(passed: int32, failed: int32, ignored: int32): void
+extern "C" fun kf_test_queue(name: str, shown: str): void
+extern "C" fun kf_test_run_queued(): int32
+extern "C" fun kf_test_queued_count(): int32
+extern "C" fun kf_expect_panic(code: str): void
+
+/// `--list` prints each test as one JSON line. `--run-test <name>` runs that
+/// one test in this process. Otherwise each test whose name contains
+/// `--filter <substring>` runs in its own child, and the report follows; a
+/// disabled test is reported, not run. Returns the program's exit code.
+pub fun run_tests(tests: &AnnotatedFunction<test, () -> void>[],
+    held_back: &AnnotatedFunction<disabled, () -> void>[]): int32 {
+    if has_flag("--list") {
+        while entry in tests { print_listing(&entry, held_back) }
+        return 0
+    }
+    val one = test_argument("--run-test")
+    if one.byte_len() > 0 { return run_one_test(tests, one) }
+    val filter = test_argument("--filter")
+    print(&"running ")
+    print(&tests.size())
+    println(&" tests")
+    var ignored = 0
+    while entry in tests {
+        if !shown_name(&entry).contains(filter) && !entry.name.contains(filter) { continue }
+        val reason: str? = disabled_reason(held_back, &entry)
+        if reason == null {
+            queue_test(entry.name, shown_name(&entry))
+        } else {
+            ignored = ignored + 1
+            print(&"test ")
+            print(&shown_name(&entry))
+            print(&" ... ignored: ")
+            println(&(reason ?: ""))
+        }
+    }
+    return run_queued_tests(filter, ignored)
+}
+
+/// The name the report shows: `@test(name = ...)`, or the function's.
+fun shown_name(entry: &AnnotatedFunction<test, () -> void>): str {
+    return if entry.args.name.byte_len() > 0 { entry.args.name } else { entry.name }
+}
+
+/// Why `entry` is disabled, or null when it runs.
+fun disabled_reason(held_back: &AnnotatedFunction<disabled, () -> void>[],
+    entry: &AnnotatedFunction<test, () -> void>): str? {
+    while item in held_back {
+        if item.name == entry.name && item.module == entry.module { return item.args.reason }
+    }
+    return null
+}
+
+/// CONSTRAINT: the runtime is reached only from non-generic functions, which
+/// core compiles.
+fun queue_test(name: str, shown: str): void {
+    unsafe { kf_test_queue(name, shown) }
+}
+
+/// Runs what was queued, prints the report and returns the exit code.
+fun run_queued_tests(filter: str, ignored: int32): int32 {
+    val failed = unsafe { kf_test_run_queued() }
+    val ran = unsafe { kf_test_queued_count() } - failed
+    println(&"")
+    if filter.byte_len() > 0 && ran == 0 && failed == 0 && ignored == 0 {
+        println(&"test result: FAILED — the filter matched no test")
+        return 1
+    }
+    unsafe { kf_test_report(ran, failed, ignored) }
+    return if failed > 0 { 1 } else { 0 }
+}
+
+/// The child's half: the parent reads the exit code. A test expecting a
+/// panic exits 0 from the panic that matches, and fails by returning.
+fun run_one_test(tests: &AnnotatedFunction<test, () -> void>[], name: str): int32 {
+    while entry in tests {
+        if entry.name == name {
+            val expected = entry.args.panics.code()
+            if expected.byte_len() > 0 { expect_panic(expected) }
+            entry.function()
+            if expected.byte_len() == 0 { return 0 }
+            if expected == "any" {
+                println(&"test returned, but should have panicked")
+            } else {
+                print(&"test returned, but should have panicked with ")
+                println(&expected)
+            }
+            return 1
+        }
+    }
+    println(&"test result: FAILED — no such test")
+    return 1
+}
+
+fun expect_panic(code: str): void {
+    unsafe { kf_expect_panic(code) }
+}
+
+/// The argument after `flag`, or `""`.
+fun test_argument(flag: str): str {
+    while i in 0..arg_count() {
+        if arg_at(i) == flag { return arg_at(i + 1) }
+    }
+    return ""
+}
+
+fun has_flag(flag: str): bool {
+    while i in 0..arg_count() {
+        if arg_at(i) == flag { return true }
+    }
+    return false
+}

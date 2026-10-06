@@ -2,9 +2,32 @@
 
 # komp-test
 
-The test driver behind `komp test`, written in KFlat and published to the
-package index as `komp_test`. komp builds a crate's test program; komp-test
-runs it.
+KFlat's tests: `testing`, the library tests are written against, and
+`komp_test`, the runner for the test programs `komp test` builds. Both are one
+package, `komp_test`, in the package index.
+
+## Writing tests
+
+A crate with tests names the library in its dev-dependencies:
+
+```toml
+[dev-dependencies]
+testing = "0.1"
+```
+
+and each `_test.kf` file imports what it uses:
+
+```kflat
+import testing.test
+
+@test
+fun adds(): void { assert_eq(1 + 1, 2, "one and one") }
+```
+
+`testing` declares `@test` and `@disabled`, and `run_tests`, the entry point
+of a test program; `komp test` builds a program around it.
+
+## Running test programs
 
 ```console
 $ komp-test target/kflat/test/app_tests --filter parse
@@ -12,19 +35,9 @@ $ komp-test target/kflat/test/app_tests --filter parse
 
 Each program named is run with `--filter` passed on, reports its own tests,
 and komp-test fails when any of them does.
-
-## Where it is going
-
-[komp-co/komp#254](https://github.com/komp-co/komp/issues/254) has the plan:
-komp asks for a test build with `komp build --tests`, and komp-test lists each
-program's tests, runs each in its own child, in parallel and under a timeout,
-and merges the reports across a workspace. core keeps only the `@test`
-annotation and the entry point a test program runs
-(`core.testing.run_tests`).
-
-komp-test talks to komp and to test programs through their command lines and
-JSON, never through the compiler's crates, so it ships without a compiler
-release.
+[komp-co/komp#254](https://github.com/komp-co/komp/issues/254) has where it
+is going: listing each program's tests, running each in its own child, in
+parallel and under a timeout, and merging the reports across a workspace.
 
 ## Building
 
@@ -32,5 +45,7 @@ release.
 $ komp test .
 $ komp build .
 ```
+
+`src/lib/` is the `testing` library, `src/bin/` the runner.
 
 MIT licensed.
