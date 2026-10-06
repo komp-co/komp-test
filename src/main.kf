@@ -1,0 +1,28 @@
+import alloc.list.*
+import core.display.println
+import std.process.Command
+
+/// Runs each test program, handing it the filter, and fails when any of them
+/// does. Each program reports its own tests.
+fun main(): int32 {
+    var args = List.new<String>()
+    while i in 0..arg_count() { args.push(String.from(arg_at(i))) }
+    val options = parse_options(&args)
+    if options.error.as_str().byte_len() > 0 {
+        println("komp-test: ${options.error}")
+        println("usage: komp-test <program>... [--filter <substring>]")
+        return 2
+    }
+    var failed = 0
+    while program in &options.programs {
+        var command = Command.new(program.as_str())
+        if options.filter.as_str().byte_len() > 0 {
+            command.arg("--filter")
+            command.arg(options.filter.as_str())
+        }
+        if !command.status().success() { failed = failed + 1 }
+    }
+    val noun = if options.programs.size() == 1 { "program" } else { "programs" }
+    println("komp-test: ${options.programs.size()} ${noun}, ${failed} failed")
+    return if failed > 0 { 1 } else { 0 }
+}

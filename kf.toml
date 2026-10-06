@@ -1,0 +1,6 @@
+[project]
+name = "komp_test"
+description = "The test driver behind `komp test`"
+version = "0.1.0"
+kind = "bin"
+kflat = "0.19"

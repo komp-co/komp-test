@@ -1,0 +1,55 @@
+name: Test
+
+# komp-test is built with the newest kflat release, installed from its release archive
+# and kept between runs. kf.toml's `kflat` pin decides the toolchain: komp
+# installs the one it names when the newest does not fit.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the newest kflat release
+        id: kflat
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --repo komp-co/komp --json tagName --jq .tagName)
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: toolchain
+        with:
+          path: ~/.kflat
+          key: kflat-${{ steps.kflat.outputs.version }}
+
+      - name: Install kflat ${{ steps.kflat.outputs.version }}
+        if: steps.toolchain.outputs.cache-hit != 'true'
+        env:
+          VERSION: ${{ steps.kflat.outputs.version }}
+        run: |
+          base="https://github.com/komp-co/komp/releases/download/v$VERSION"
+          curl -fsSLO "$base/kflat-$VERSION.tar.gz"
+          curl -fsSLO "$base/kflat-$VERSION.tar.gz.sha256"
+          sha256sum -c "kflat-$VERSION.tar.gz.sha256"
+          tar -xzf "kflat-$VERSION.tar.gz"
+          sh "kflat-$VERSION/install.sh"
+
+      - name: Put komp on PATH
+        run: echo "$HOME/.kflat/bin" >> "$GITHUB_PATH"
+
+      - name: Unit tests
+        run: komp test .
+
+      - name: Run its own test program through itself
+        run: |
+          komp build .
+          target/kflat/komp_test target/kflat/test/komp_test_tests

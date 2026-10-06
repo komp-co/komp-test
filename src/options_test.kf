@@ -1,0 +1,50 @@
+import alloc.list.*
+import core.assert.assert_eq
+
+fun args_of(words: &List<str>): List<String> {
+    var out = List.new<String>()
+    while word in words { out.push(String.from(word)) }
+    return out
+}
+
+@test
+fun programs_are_taken_in_order(): void {
+    var words = List.new<str>()
+    words.push("a")
+    words.push("b")
+    val options = parse_options(&args_of(&words))
+    assert_eq(options.programs.at(1).as_str(), "b", "the second program")
+}
+
+@test
+fun a_filter_is_taken_anywhere(): void {
+    var words = List.new<str>()
+    words.push("--filter")
+    words.push("parse")
+    words.push("a")
+    val options = parse_options(&args_of(&words))
+    assert_eq(options.filter.as_str(), "parse", "the filter")
+}
+
+@test
+fun a_filter_without_a_substring_is_an_error(): void {
+    var words = List.new<str>()
+    words.push("a")
+    words.push("--filter")
+    val options = parse_options(&args_of(&words))
+    assert_eq(options.error.as_str(), "`--filter` needs a substring", "the error")
+}
+
+@test
+fun an_unknown_option_is_an_error(): void {
+    var words = List.new<str>()
+    words.push("--jobs")
+    val options = parse_options(&args_of(&words))
+    assert_eq(options.error.as_str(), "unknown option `--jobs`", "the error")
+}
+
+@test
+fun no_program_is_an_error(): void {
+    val options = parse_options(&List.new<String>())
+    assert_eq(options.error.as_str(), "no test program to run", "the error")
+}

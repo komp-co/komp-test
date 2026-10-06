@@ -1,0 +1,39 @@
+// What `komp-test` was asked to run: the test programs, and the filter each
+// of them is handed.
+
+import alloc.list.*
+
+pub struct Options {
+    /// Test programs, as `komp build` produced them.
+    pub var programs: List<String>
+    /// Passed to each program as `--filter`; "" runs every test.
+    pub var filter: String
+    /// Why the arguments cannot be run; "" when they can.
+    pub var error: String
+}
+
+/// `<program>... [--filter <substring>]`, in any order.
+pub fun parse_options(args: &List<String>): Options {
+    var options = Options { programs: List.new<String>(), filter: String.from(""), error: String.from("") }
+    var i: uint64 = 0
+    while i < args.size() {
+        val arg = args.at(i).as_str()
+        if arg == "--filter" {
+            if i + 1 >= args.size() {
+                options.error = String.from("`--filter` needs a substring")
+                return options
+            }
+            options.filter = args.at(i + 1).clone()
+            i = i + 2
+            continue
+        }
+        if arg.starts_with("--") {
+            options.error = "unknown option `${arg}`"
+            return options
+        }
+        options.programs.push(args.at(i).clone())
+        i = i + 1
+    }
+    if options.programs.size() == 0 { options.error = String.from("no test program to run") }
+    return options
+}
