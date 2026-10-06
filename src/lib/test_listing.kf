@@ -1,0 +1,74 @@
+// `--list`: one JSON object per test, for a runner that drives the program.
+
+/// `{"name": ..., "shown": ..., "module": ..., "file": ..., "line": ...,
+/// "panics": ..., "disabled": ...}`; `disabled` is the reason, or null.
+fun print_listing(entry: &AnnotatedFunction<test, () -> void>,
+    held_back: &AnnotatedFunction<disabled, () -> void>[]): void {
+    print(&"{\"name\":")
+    print_json_text(entry.name)
+    print(&",\"shown\":")
+    print_json_text(shown_name(entry))
+    print(&",\"module\":")
+    print_json_text(entry.module)
+    print(&",\"file\":")
+    print_json_text(entry.file)
+    print(&",\"line\":")
+    print(&entry.line)
+    print(&",\"panics\":")
+    print_json_text(entry.args.panics.code())
+    print(&",\"disabled\":")
+    val reason: str? = disabled_reason(held_back, entry)
+    if reason == null { print(&"null") } else { print_json_text(reason ?: "") }
+    println(&"}")
+}
+
+/// `text` as a JSON string, quoted and escaped.
+fun print_json_text(text: str): void {
+    var out = JsonChunk { bytes: Array<uint8, 64> {}, len: 0 }
+    out.put(34)
+    while i in 0..text.byte_len() {
+        val b = text.byte_at(i)
+        if b == 34 || b == 92 {
+            out.put(92)
+            out.put(b)
+        } else if b < 32 {
+            out.put_escape(b)
+        } else {
+            out.put(b)
+        }
+    }
+    out.put(34)
+    out.flush()
+}
+
+/// Bytes printed a run at a time, since core cannot cut a `str` short.
+struct JsonChunk {
+    var bytes: Array<uint8, 64>
+    var len: uint64
+}
+
+impl JsonChunk {
+    mutating fun put(b: uint8): void {
+        if self.len + 1 >= 64 { self.flush() }
+        *self.bytes.at_mut(self.len) = b
+        self.len = self.len + 1
+    }
+
+    /// `\u00XX`.
+    mutating fun put_escape(b: uint8): void {
+        val digits = "0123456789abcdef"
+        self.put(92)
+        self.put(117)
+        self.put(48)
+        self.put(48)
+        self.put(digits.byte_at((b / 16) as uint64))
+        self.put(digits.byte_at((b % 16) as uint64))
+    }
+
+    mutating fun flush(): void {
+        *self.bytes.at_mut(self.len) = 0
+        val run = unsafe { (&self.bytes) as Ptr<uint8> as str }
+        print(&run)
+        self.len = 0
+    }
+}

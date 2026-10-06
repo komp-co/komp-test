@@ -1,5 +1,6 @@
 import alloc.list.*
 import core.assert.assert_eq
+import testing.test
 
 fun args_of(words: &List<str>): List<String> {
     var out = List.new<String>()
